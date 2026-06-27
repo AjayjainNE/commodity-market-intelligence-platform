@@ -1,0 +1,27 @@
+USE WAREHOUSE INTEL_WH;
+USE DATABASE COMMODITY_INTEL;
+
+CREATE OR REPLACE VIEW ANALYTICS.V_PIPELINE_AUDIT AS
+SELECT step_no, layer, step_name, object_name, rows_in, rows_out, rows_dropped,
+       status, message, logged_at
+FROM AUDIT.RUN_LOG
+WHERE run_id = (SELECT run_id FROM AUDIT.RUN_LOG ORDER BY logged_at DESC LIMIT 1)
+ORDER BY step_no, object_name;
+
+CREATE OR REPLACE VIEW ANALYTICS.V_PIPELINE_HEALTH AS
+SELECT (SELECT run_id FROM AUDIT.RUN_LOG ORDER BY logged_at DESC LIMIT 1) AS run_id,
+  COUNT(*) AS stages_logged,
+  SUM(IFF(status='OK',1,0)) AS stages_ok,
+  SUM(IFF(status='WARN',1,0)) AS stages_warn,
+  SUM(IFF(status='FAIL',1,0)) AS stages_fail,
+  MAX(logged_at) AS finished_at,
+  CASE WHEN SUM(IFF(status='FAIL',1,0))>0 THEN 'FAIL'
+       WHEN SUM(IFF(status='WARN',1,0))>0 THEN 'WARN'
+       ELSE 'HEALTHY' END AS pipeline_status
+FROM ANALYTICS.V_PIPELINE_AUDIT;
+
+SELECT * FROM ANALYTICS.V_PIPELINE_AUDIT;
+
+SELECT * FROM ANALYTICS.V_PIPELINE_HEALTH;
+
+ALTER WAREHOUSE INTEL_WH SUSPEND; -- WAREHOUSE SUSPENDED
